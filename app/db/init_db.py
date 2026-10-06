@@ -84,6 +84,8 @@ DEFAULT_ROLES = {
         "permissions": [
             "appointments:read",
             "queue:read",
+            "queue:manage",
+            "queue:call_patient",
             "vitals:read",
             "vitals:create",
             "consultations:read",

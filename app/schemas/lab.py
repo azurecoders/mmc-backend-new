@@ -68,3 +68,39 @@ class LabOrderResponse(BaseModel):
     result: Optional[LabResultResponse] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+# --- AI Diagnostic Lab Report Simplifier Schemas ---
+class LabInterpretedParameter(BaseModel):
+    parameter_name: str = Field(..., description="Name of biomarker or lab parameter")
+    measured_value: str = Field(..., description="Measured numerical value with unit e.g. 10.2 g/dL")
+    reference_range: str = Field(..., description="Standard reference range e.g. 13.5 - 17.5 g/dL")
+    status: str = Field(..., description="NORMAL, ELEVATED, LOW, CRITICALLY_HIGH, CRITICALLY_LOW")
+    plain_english_meaning: str = Field(..., description="Clear, non-panicking patient explanation of what this level means")
+    clinical_significance: str = Field(..., description="High-density clinical correlation for physician evaluation")
+
+class SimplifyLabReportRequest(BaseModel):
+    test_name: Optional[str] = None
+    test_category: Optional[str] = None
+    result_summary: Optional[str] = None
+    findings_json: Optional[Dict[str, Any]] = None
+    patient_age: Optional[int] = None
+    patient_gender: Optional[str] = None
+    clinical_diagnosis: Optional[str] = None
+
+class LabReportSimplificationResponse(BaseModel):
+    order_id: Optional[uuid.UUID] = None
+    test_name: str
+    test_category: str
+    patient_name: str
+    overall_status: str = Field(..., description="NORMAL, ATTENTION_NEEDED, or CRITICAL_ALERT")
+    is_abnormal: bool
+    patient_summary: str = Field(..., description="Empathetic, clear, non-panicking plain-English breakdown for patient")
+    doctor_snapshot: str = Field(..., description="High-density clinical snapshot for doctors of out-of-range critical values")
+    critical_flags: list[str] = Field(default=[], description="List of immediate red-flag or critical values")
+    interpreted_parameters: list[LabInterpretedParameter] = []
+    questions_for_doctor: list[str] = []
+    recommended_actions: list[str] = []
+    ai_model_used: str
+    is_live_ai: bool
+    generated_at: datetime
+

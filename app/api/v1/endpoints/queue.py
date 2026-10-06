@@ -2,8 +2,11 @@ from datetime import date
 from typing import Annotated, List, Optional
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.appointment import Appointment
+from app.models.queue import QueueEntry
 from app.api.deps import (
     get_current_user,
     get_db,
@@ -92,12 +95,65 @@ async def call_patient(
     Sets patient account/token status to CALLED_IN.
     Instantly triggers Socket.IO event 'queue:your_turn' to patient and doctor screen.
     """
-    queue_entry = await crud_queue.get_by_id(db, call_in.queue_entry_id)
+    queue_entry: Optional[QueueEntry] = None
+
+    if call_in.queue_entry_id:
+        queue_entry = await crud_queue.get_by_id(db, call_in.queue_entry_id)
+        if not queue_entry:
+            # Check if this ID is an appointment ID
+            stmt_apt = select(Appointment).where(Appointment.id == call_in.queue_entry_id)
+            res_apt = await db.execute(stmt_apt)
+            apt = res_apt.scalar_one_or_none()
+            if apt:
+                existing_qe = await crud_queue.get_by_appointment_id(db, apt.id)
+                if existing_qe:
+                    queue_entry = existing_qe
+                else:
+                    queue_entry = await crud_queue.check_in(db, appointment=apt)
+
+    if not queue_entry and call_in.doctor_id:
+        # Find next waiting patient in queue for this doctor today
+        today = date.today()
+        stmt_next = (
+            select(QueueEntry)
+            .where(
+                QueueEntry.doctor_id == call_in.doctor_id,
+                QueueEntry.queue_date == today,
+                QueueEntry.status == "WAITING",
+            )
+            .order_by(QueueEntry.is_priority.desc(), QueueEntry.token_number.asc())
+        )
+        res_next = await db.execute(stmt_next)
+        queue_entry = res_next.scalars().first()
+
+        if not queue_entry:
+            # Check if there is an approved appointment for today not yet checked in
+            stmt_apt = (
+                select(Appointment)
+                .where(
+                    Appointment.doctor_id == call_in.doctor_id,
+                    Appointment.appointment_date == today,
+                    Appointment.status.in_(["APPROVED", "CHECKED_IN", "PENDING_APPROVAL"]),
+                )
+                .order_by(Appointment.token_number.asc())
+            )
+            res_apts = await db.execute(stmt_apt)
+            today_apts = res_apts.scalars().all()
+            for a in today_apts:
+                existing_qe = await crud_queue.get_by_appointment_id(db, a.id)
+                if not existing_qe:
+                    queue_entry = await crud_queue.check_in(db, appointment=a)
+                    break
+                elif existing_qe.status == "WAITING":
+                    queue_entry = existing_qe
+                    break
+
     if not queue_entry:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Queue entry not found",
+            detail="No patients currently waiting in queue for this doctor.",
         )
+
     if queue_entry.status in ["COMPLETED", "CANCELLED"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

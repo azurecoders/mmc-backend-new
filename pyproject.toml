@@ -19,7 +19,9 @@ dependencies = [
     "python-socketio>=5.17.0",
     "sqlalchemy[asyncio]>=2.0",
     "uvicorn[standard]>=0.54.0",
+    "openai>=3.24.0",
 ]
+
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

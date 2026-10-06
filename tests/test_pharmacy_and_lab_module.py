@@ -436,3 +436,39 @@ async def test_lab_assistant_sample_collection_and_results():
             json=result_payload,
         )
         assert dup_submit.status_code == 400
+
+        # 11. AI Lab Report Simplifier - Patient & Clinician
+        simplify_resp = await client.post(
+            f"/api/v1/lab/orders/{order_id}/simplify-report",
+            headers=p_headers,
+        )
+        assert simplify_resp.status_code == 200
+        simplified = simplify_resp.json()
+        assert "Complete Blood Count" in simplified["test_name"]
+        assert simplified["is_abnormal"] is True
+        assert len(simplified["patient_summary"]) > 20
+        assert len(simplified["doctor_snapshot"]) > 10
+        assert len(simplified["interpreted_parameters"]) > 0
+        assert simplified["overall_status"] in ["NORMAL", "ATTENTION_NEEDED", "CRITICAL_ALERT"]
+
+        # 12. Preview AI interpretation for uncommitted findings
+        preview_resp = await client.post(
+            "/api/v1/lab/simplify-findings",
+            headers=lab_headers,
+            json={
+                "test_name": "Lipid Profile",
+                "test_category": "BIOCHEMISTRY",
+                "result_summary": "Total Cholesterol: 245 mg/dL; Triglycerides: 210 mg/dL",
+                "findings_json": {
+                    "parameters": [
+                        {"parameter": "Total Cholesterol", "value": "245", "unit": "mg/dL", "reference_range": "< 200", "flag": "HIGH"},
+                        {"parameter": "Triglycerides", "value": "210", "unit": "mg/dL", "reference_range": "< 150", "flag": "HIGH"},
+                    ]
+                },
+            },
+        )
+        assert preview_resp.status_code == 200
+        preview_data = preview_resp.json()
+        assert preview_data["test_name"] == "Lipid Profile"
+        assert preview_data["is_abnormal"] is True
+        assert len(preview_data["interpreted_parameters"]) >= 1

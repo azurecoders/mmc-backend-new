@@ -52,6 +52,7 @@ class CRUDLab:
                 joinedload(LabOrder.test),
                 joinedload(LabOrder.patient),
                 joinedload(LabOrder.doctor),
+                joinedload(LabOrder.consultation),
                 joinedload(LabOrder.result).joinedload(LabResult.lab_assistant),
             )
         )

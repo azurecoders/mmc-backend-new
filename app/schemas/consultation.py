@@ -118,3 +118,132 @@ class PrescriptionExplanationResponse(BaseModel):
     warning_signs_to_watch: List[str] = []
     general_advice: str
     created_at: datetime
+
+# --- AI Feature 1: Drug Interaction & Allergy Safety Guard ---
+class DrugSafetyCheckItem(BaseModel):
+    interaction_type: str = Field(..., description="DRUG_DRUG, DRUG_ALLERGY, or DRUG_DISEASE")
+    severity: str = Field(..., description="HIGH, MEDIUM, or LOW")
+    primary_item: str = Field(..., description="The prescribed medicine involved")
+    interacting_with: str = Field(..., description="The other drug, allergen, or condition")
+    clinical_effect: str = Field(..., description="What adverse event or risk could occur")
+    clinical_recommendation: str = Field(..., description="Alternative recommendation or monitoring advice")
+
+class DrugSafetyCheckRequest(BaseModel):
+    medicines: List[str] = Field(..., description="List of prescribed medicine names")
+    allergies: Optional[List[str]] = Field(default=[], description="List of known patient drug allergies")
+    chronic_conditions: Optional[List[str]] = Field(default=[], description="List of patient chronic conditions")
+    patient_age: Optional[int] = None
+    patient_gender: Optional[str] = None
+
+class DrugSafetyCheckResponse(BaseModel):
+    overall_safety: str = Field(..., description="SAFE, MODERATE_WARNING, or CRITICAL_CONTRAINDICATION")
+    safety_score: int = Field(..., description="0-100 safety index score")
+    summary: str
+    warnings_count: int
+    interactions: List[DrugSafetyCheckItem] = []
+    safer_alternatives: List[str] = []
+    ai_model_used: str
+    is_live_ai: bool
+
+# --- AI Feature 2: Differential Diagnosis & Lab Test Assistant ---
+class DifferentialDiagnosisItem(BaseModel):
+    diagnosis: str
+    likelihood: str = Field(..., description="HIGH, MODERATE, or LOW")
+    clinical_rationale: str
+    recommended_tests: List[str] = []
+
+class SuggestedLabOrderItem(BaseModel):
+    test_name: str
+    test_id: Optional[str] = None
+    urgency: str = Field(default="ROUTINE", description="ROUTINE, URGENT, or STAT")
+    clinical_justification: str
+
+class ClinicalCopilotRequest(BaseModel):
+    chief_complaint: str
+    symptoms: Optional[str] = None
+    vitals_bp: Optional[str] = None
+    vitals_heart_rate: Optional[int] = None
+    vitals_spo2: Optional[float] = None
+    vitals_temperature: Optional[float] = None
+    chronic_conditions: Optional[List[str]] = []
+    patient_age: Optional[int] = None
+    patient_gender: Optional[str] = None
+
+class ClinicalCopilotResponse(BaseModel):
+    summary_assessment: str
+    differential_diagnoses: List[DifferentialDiagnosisItem] = []
+    suggested_lab_orders: List[SuggestedLabOrderItem] = []
+    red_flag_warnings: List[str] = []
+    recommended_physical_exams: List[str] = []
+    ai_model_used: str
+    is_live_ai: bool
+
+# --- AI Feature 3: Ambient Voice-to-SOAP Clinical Scribe ---
+class VoiceToSoapRequest(BaseModel):
+    dictation_text: str = Field(..., min_length=3, description="Spoken or typed consultation dictation")
+    chief_complaint: Optional[str] = None
+    vitals_summary: Optional[str] = None
+    patient_name: Optional[str] = None
+
+class ExtractedPrescription(BaseModel):
+    medicine_name: str
+    dosage: str = "1 tab"
+    frequency: str = "Twice daily (1-0-1)"
+    duration: str = "5 days"
+    instructions: str = "After meals with water"
+
+class VoiceToSoapResponse(BaseModel):
+    subjective: str
+    objective: str
+    assessment: str
+    plan: str
+    structured_soap_notes: str
+    suggested_diagnosis: str
+    suggested_special_instructions: Optional[str] = None
+    extracted_prescriptions: List[ExtractedPrescription] = []
+    suggested_follow_up_days: Optional[int] = None
+    ai_model_used: str
+    is_live_ai: bool
+
+# --- AI Feature 4: Personalized Diet & Lifestyle Plan Generator ---
+class DayMealPlanItem(BaseModel):
+    day: str = Field(..., description="Day title (e.g. Day 1 (Monday))")
+    theme: str = Field(..., description="Daily dietary focus or clinical theme")
+    breakfast: str = Field(..., description="Breakfast meal recommendation and portion guidance")
+    lunch: str = Field(..., description="Lunch meal recommendation and portion guidance")
+    snack: str = Field(..., description="Nutrient-dense healthy snack")
+    dinner: str = Field(..., description="Dinner meal recommendation, light and digestible")
+    clinical_note: Optional[str] = Field(None, description="Why this meal plan aids the patient condition")
+
+class FoodRestrictionItem(BaseModel):
+    food_to_avoid: str = Field(..., description="Name of food, ingredient, or beverage")
+    reason: str = Field(..., description="Clinical reason why it exacerbates the patient condition")
+    healthy_substitute: str = Field(..., description="Recommended healthy culinary alternative")
+
+class GenerateDietPlanRequest(BaseModel):
+    diagnosis: Optional[str] = None
+    chronic_conditions: Optional[List[str]] = []
+    allergies: Optional[List[str]] = []
+    dietary_preferences: Optional[str] = None
+    patient_age: Optional[int] = None
+    patient_gender: Optional[str] = None
+
+class PersonalizedDietPlanResponse(BaseModel):
+    consultation_id: Optional[uuid.UUID] = None
+    diagnosis: str
+    patient_name: str
+    target_conditions: List[str] = []
+    dietary_framework: str = Field(..., description="Clinical nutritional protocol name (e.g. DASH, Low-GI)")
+    daily_calorie_target: Optional[str] = None
+    daily_hydration_liters: float = Field(..., description="Recommended daily water/fluid intake in liters")
+    hydration_guidelines: str = Field(..., description="Specific hydration schedule and advice")
+    foods_to_avoid: List[FoodRestrictionItem] = []
+    seven_day_meal_plan: List[DayMealPlanItem] = []
+    physical_activity_plan: List[str] = []
+    lifestyle_and_sleep_habits: List[str] = []
+    clinical_precautions: List[str] = []
+    ai_model_used: str
+    is_live_ai: bool
+    generated_at: datetime
+
+

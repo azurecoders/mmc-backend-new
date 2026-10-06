@@ -162,13 +162,16 @@ Production-grade, asynchronous FastAPI backend with dynamic Role-Based Access Co
 ## Running Locally
 
 ```bash
-# 1. Activate virtual environment
+# 1. Activate virtual environment (or create with python -m venv .venv)
 source .venv/bin/activate
 
-# 2. Run Database Migrations
+# 2. Install dependencies
+pip install -r requirements.txt
+
+# 3. Run Database Migrations
 alembic upgrade head
 
-# 3. Start Development Server (FastAPI + Socket.IO)
+# 4. Start Development Server (FastAPI + Socket.IO)
 uvicorn app.main:socket_app --reload --port 8000
 ```
 

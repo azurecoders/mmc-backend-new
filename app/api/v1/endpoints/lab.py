@@ -13,11 +13,14 @@ from app.crud.crud_lab import crud_lab
 from app.models.user import User
 from app.schemas.lab import (
     LabOrderResponse,
+    LabReportSimplificationResponse,
     LabResultResponse,
     LabResultSubmitRequest,
     LabTestCatalogCreate,
     LabTestCatalogResponse,
+    SimplifyLabReportRequest,
 )
+from app.services.ai_lab_simplifier import ai_lab_simplifier
 
 router = APIRouter()
 
@@ -157,3 +160,76 @@ async def submit_lab_result(
     await sio.emit("lab:report_completed", report_alert, room=f"doctor:{order.doctor_id}")
 
     return lab_result
+
+
+@router.post(
+    "/orders/{order_id}/simplify-report",
+    response_model=LabReportSimplificationResponse,
+    summary="AI Diagnostic Lab Report Simplifier (for Patients & Clinicians)",
+    dependencies=[Depends(require_permissions(["lab:read_orders"]))],
+)
+async def simplify_order_report(
+    order_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    order = await crud_lab.get_order_by_id(db, order_id)
+    if not order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Lab order not found.",
+        )
+
+    user_roles = {r.code for r in current_user.roles}
+    if "PATIENT" in user_roles and "SUPER_ADMIN" not in user_roles and "LAB_ASSISTANT" not in user_roles and "DOCTOR" not in user_roles:
+        if order.patient_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to access this lab report.",
+            )
+
+    if order.status != "COMPLETED" or not order.result:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Diagnostic results have not yet been submitted for this lab order.",
+        )
+
+    patient_name = order.patient.full_name if order.patient else "Patient"
+    test_name = order.test.name if order.test else "Diagnostic Test"
+    test_category = order.test.category if order.test else "GENERAL"
+    result_summary = order.result.result_summary
+    findings_json = order.result.findings_json
+    clinical_diagnosis = order.consultation.diagnosis if order.consultation else None
+
+    return await ai_lab_simplifier.simplify_lab_report(
+        test_name=test_name,
+        test_category=test_category,
+        patient_name=patient_name,
+        result_summary=result_summary,
+        findings_json=findings_json,
+        clinical_diagnosis=clinical_diagnosis,
+        order_id=order.id,
+    )
+
+
+@router.post(
+    "/simplify-findings",
+    response_model=LabReportSimplificationResponse,
+    summary="Preview AI interpretation of diagnostic lab findings (for Lab Assistant & Doctor)",
+    dependencies=[Depends(require_permissions(["lab:read_orders"]))],
+)
+async def preview_simplify_findings(
+    payload: SimplifyLabReportRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    return await ai_lab_simplifier.simplify_lab_report(
+        test_name=payload.test_name or "Diagnostic Test",
+        test_category=payload.test_category or "GENERAL",
+        patient_name="Patient",
+        result_summary=payload.result_summary or "Laboratory findings",
+        findings_json=payload.findings_json,
+        patient_age=payload.patient_age,
+        patient_gender=payload.patient_gender,
+        clinical_diagnosis=payload.clinical_diagnosis,
+    )
+

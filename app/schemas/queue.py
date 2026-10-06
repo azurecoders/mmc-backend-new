@@ -64,4 +64,6 @@ class QueueCheckInRequest(BaseModel):
     is_priority: bool = Field(default=False, description="Set True for emergency or priority patient")
 
 class QueueCallPatientRequest(BaseModel):
-    queue_entry_id: uuid.UUID = Field(..., description="Queue entry to activate/call into doctor cabin")
+    queue_entry_id: Optional[uuid.UUID] = Field(None, description="Queue entry to activate/call into doctor cabin")
+    doctor_id: Optional[uuid.UUID] = Field(None, description="Doctor ID to call the next waiting patient for")
+
