@@ -322,7 +322,7 @@ class CRUDQueue:
         )
 
         return WaitingRoomTVDisplay(
-            hospital_name="ApexCare Hospital & Medical Center",
+            hospital_name="MMC Hospital",
             queue_date=queue_date,
             doctors=summaries,
         )

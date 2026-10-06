@@ -15,13 +15,13 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: Initialize DB tables and seed roles/permissions
-    logger.info("Starting up Hospital Management System Backend...")
+    logger.info("Starting up MMC Hospital Management System Backend...")
     async with AsyncSessionLocal() as session:
         await init_db(session)
     logger.info("Application startup and database initialization completed.")
     yield
     # Shutdown
-    logger.info("Shutting down Hospital Management System Backend...")
+    logger.info("Shutting down MMC Hospital Management System Backend...")
 
 app = FastAPI(
     title=settings.PROJECT_NAME,

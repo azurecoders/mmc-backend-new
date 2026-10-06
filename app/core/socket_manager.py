@@ -52,6 +52,8 @@ async def connect(sid: str, environ: Dict[str, Any], auth: Optional[Dict[str, An
                 await sio.enter_room(sid, "pharmacy:orders")
             if "LAB_ASSISTANT" in roles or "SUPER_ADMIN" in roles:
                 await sio.enter_room(sid, "lab:orders")
+            if any(r in roles for r in ["DOCTOR", "NURSE", "COMPOUNDER", "SUPER_ADMIN"]):
+                await sio.enter_room(sid, "staff:emergency")
                 
             logger.info(f"Socket connected: sid={sid} user={user_id} roles={roles}")
             return True

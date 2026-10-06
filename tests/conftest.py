@@ -7,6 +7,7 @@ from app.models.department import Department
 from app.models.doctor import DoctorProfile, DoctorSchedule
 from app.models.role import Role
 from app.models.user import User
+from app.db.init_db import init_db
 
 TEST_DOCTORS_SEED = [
     {
@@ -59,6 +60,7 @@ TEST_STAFF_SEEDS = [
     {"email": "compounder@hospital.com", "phone": "+10000000001", "name": "Hospital Reception Compounder", "role": "COMPOUNDER", "pass": "Compounder@123"},
     {"email": "pharmacist@hospital.com", "phone": "+10000000002", "name": "Head Pharmacist", "role": "PHARMACIST", "pass": "Pharmacist@123"},
     {"email": "lab@hospital.com", "phone": "+10000000003", "name": "Senior Lab Pathologist", "role": "LAB_ASSISTANT", "pass": "Lab@123456"},
+    {"email": "nurse@hospital.com", "phone": "+10000000004", "name": "Head Nurse Sarah Jenkins, RN", "role": "NURSE", "pass": "Nurse@123"},
 ]
 
 @pytest_asyncio.fixture(autouse=True, scope="session")
@@ -68,6 +70,9 @@ async def provision_test_environment():
     then purges them at teardown to keep the live DB pristine.
     """
     async with AsyncSessionLocal() as session:
+        # Initialize schema, roles, and emergency groups
+        await init_db(session)
+
         # Load roles
         roles_res = await session.execute(select(Role))
         roles_map = {r.code: r for r in roles_res.scalars().all()}
@@ -147,6 +152,7 @@ async def provision_test_environment():
     # Teardown: purge everything except superadmin to leave the DB completely clean!
     async with AsyncSessionLocal() as session:
         from app.models.lab import LabResult, LabOrder
+        from app.models.emergency import EmergencyAlertResponder, EmergencyAlert
         from app.models.pharmacy import MedicineDispenseRecord
         from app.models.consultation import PrescriptionItem, Consultation
         from app.models.patient import PatientVitalsLog, PatientMedicalProfile
@@ -154,6 +160,8 @@ async def provision_test_environment():
         from app.models.appointment import Appointment
         from app.models.token import RefreshToken
 
+        await session.execute(delete(EmergencyAlertResponder))
+        await session.execute(delete(EmergencyAlert))
         await session.execute(delete(LabResult))
         await session.execute(delete(LabOrder))
         await session.execute(delete(MedicineDispenseRecord))

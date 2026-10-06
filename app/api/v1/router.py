@@ -13,6 +13,7 @@ from app.api.v1.endpoints import (
     roles,
     users,
     vitals,
+    emergency,
 )
 
 api_router = APIRouter()
@@ -30,3 +31,4 @@ api_router.include_router(lab.router, prefix="/lab", tags=["Laboratory & Diagnos
 api_router.include_router(pharmacy.router, prefix="/pharmacy", tags=["Pharmacy & Medication Dispensing"])
 api_router.include_router(patients.router, prefix="/patients", tags=["Patient Medical Profiles & History"])
 api_router.include_router(vitals.router, prefix="/vitals", tags=["Vitals Logging & AI Triage Scoring"])
+api_router.include_router(emergency.router, prefix="/emergency", tags=["Emergency Color Codes & Teams"])

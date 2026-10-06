@@ -11,6 +11,7 @@ from app.models.permission import Permission
 from app.models.pharmacy import PharmacyMedicine
 from app.models.role import Role
 from app.models.user import User
+from app.models.emergency import EmergencyCodeGroup
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +69,11 @@ DEFAULT_PERMISSIONS = [
     {"code": "pharmacy:read_inventory", "name": "Read Inventory", "module": "PHARMACY", "description": "View pharmacy drug stock"},
     {"code": "pharmacy:manage_inventory", "name": "Manage Inventory", "module": "PHARMACY", "description": "Pharmacist updates drug stock, prices, and batches"},
     {"code": "pharmacy:dispense", "name": "Dispense Medicine", "module": "PHARMACY", "description": "Pharmacist confirms medicine dispensation"},
+
+    # Emergency Codes & Responders
+    {"code": "emergency:trigger", "name": "Trigger Emergency Code", "module": "EMERGENCY", "description": "Trigger hospital emergency color code broadcast"},
+    {"code": "emergency:read", "name": "Read Emergency Alerts", "module": "EMERGENCY", "description": "View active and historical hospital code alerts"},
+    {"code": "emergency:manage_groups", "name": "Manage Emergency Groups", "module": "EMERGENCY", "description": "Assign staff members to emergency code responder teams"},
 ]
 
 DEFAULT_ROLES = {
@@ -96,6 +102,8 @@ DEFAULT_ROLES = {
             "pharmacy:read_inventory",
             "lab:order_test",
             "lab:read_orders",
+            "emergency:trigger",
+            "emergency:read",
         ],
     },
     "COMPOUNDER": {
@@ -113,6 +121,24 @@ DEFAULT_ROLES = {
             "vitals:read",
             "vitals:create",
             "users:create",
+            "emergency:trigger",
+            "emergency:read",
+        ],
+    },
+    "NURSE": {
+        "name": "Nurse / Ward Staff",
+        "description": "Ward care, vitals logging, patient monitoring, and rapid emergency response",
+        "is_system": True,
+        "permissions": [
+            "appointments:read",
+            "queue:read",
+            "vitals:read",
+            "vitals:create",
+            "consultations:read",
+            "prescriptions:read",
+            "lab:read_orders",
+            "emergency:trigger",
+            "emergency:read",
         ],
     },
     "LAB_ASSISTANT": {
@@ -232,6 +258,65 @@ DEFAULT_PHARMACY_MEDICINES = [
     },
 ]
 
+DEFAULT_EMERGENCY_GROUPS = [
+    {
+        "code": "CODE_BLUE",
+        "name": "Code Blue — Cardiac Arrest / CPR",
+        "color_hex": "#2563EB",
+        "badge_color": "blue",
+        "description": "Adult or pediatric cardiac/respiratory arrest requiring immediate CPR resuscitation & crash cart.",
+        "call_to_action": "Resuscitation team proceed immediately with crash cart & defibrillator",
+    },
+    {
+        "code": "CODE_RED",
+        "name": "Code Red — Fire & Smoke Alert",
+        "color_hex": "#DC2626",
+        "badge_color": "red",
+        "description": "Active fire, electrical short circuit, or dense smoke detected. Execute hospital RACE evacuation protocol.",
+        "call_to_action": "Fire marshals and emergency safety team assemble; secure zone",
+    },
+    {
+        "code": "CODE_PINK",
+        "name": "Code Pink — Infant / Pediatric Emergency",
+        "color_hex": "#DB2777",
+        "badge_color": "pink",
+        "description": "Pediatric acute respiratory compromise, infant cardiac arrest, or suspected child abduction.",
+        "call_to_action": "Pediatric rapid response code team assemble immediately",
+    },
+    {
+        "code": "CODE_YELLOW",
+        "name": "Code Yellow — Disaster / Mass Casualty",
+        "color_hex": "#D97706",
+        "badge_color": "yellow",
+        "description": "External multi-trauma disaster, vehicle collision, or explosion resulting in mass patient influx.",
+        "call_to_action": "All available ER physicians, triage staff, and trauma surgeons report to triage bay",
+    },
+    {
+        "code": "CODE_ORANGE",
+        "name": "Code Orange — Hazardous Spill / Biohazard",
+        "color_hex": "#EA580C",
+        "badge_color": "orange",
+        "description": "Toxic chemical, concentrated acid, radiation, or infectious biohazard leak.",
+        "call_to_action": "Hazmat decontamination team proceed with Level B/C PPE",
+    },
+    {
+        "code": "CODE_BLACK",
+        "name": "Code Black — Security / Armed Intruder",
+        "color_hex": "#1E293B",
+        "badge_color": "dark",
+        "description": "Violent assailant, weapon threat, or combative intruder endangering patients or staff.",
+        "call_to_action": "Hospital security and local police respond; ward shelter-in-place initiated",
+    },
+    {
+        "code": "RAPID_RESPONSE",
+        "name": "Rapid Response — Vital Deterioration",
+        "color_hex": "#059669",
+        "badge_color": "emerald",
+        "description": "Acute bedside clinical decompensation, severe hypoxia, hypotension, or GCS drop before cardiac arrest.",
+        "call_to_action": "ICU physician and critical care nurse bedside evaluation within 3 minutes",
+    },
+]
+
 async def init_db(db: AsyncSession) -> None:
     """
     Initializes database schema, seeds permissions, roles, superadmin,
@@ -297,7 +382,7 @@ async def init_db(db: AsyncSession) -> None:
 
     if not admin_user:
         admin_role = roles_map.get("SUPER_ADMIN")
-        new_admin = User(
+        admin_user = User(
             email=admin_email,
             phone="+10000000000",
             full_name=settings.FIRST_SUPERADMIN_NAME,
@@ -306,7 +391,8 @@ async def init_db(db: AsyncSession) -> None:
             is_verified=True,
             roles=[admin_role] if admin_role else [],
         )
-        db.add(new_admin)
+        db.add(admin_user)
+        await db.flush()
         logger.info(f"Created default Super Admin user: {admin_email}")
 
 
@@ -365,5 +451,56 @@ async def init_db(db: AsyncSession) -> None:
             )
             db.add(new_med)
 
+    # 10. Seed Default Nurse User
+    nurse_email = "nurse@hospital.com"
+    stmt = select(User).where(User.email == nurse_email)
+    result = await db.execute(stmt)
+    nurse_user = result.scalar_one_or_none()
+    nurse_role = roles_map.get("NURSE")
+    if not nurse_user:
+        nurse_user = User(
+            email=nurse_email,
+            phone="+10000000004",
+            full_name="Nurse Sarah Jenkins, RN",
+            hashed_password=hash_password("Nurse@123"),
+            is_active=True,
+            is_verified=True,
+            roles=[nurse_role] if nurse_role else [],
+        )
+        db.add(nurse_user)
+        await db.flush()
+        logger.info(f"Created default Nurse user: {nurse_email}")
+
+    # 11. Seed Emergency Code Groups
+    groups_map = {}
+    for g_data in DEFAULT_EMERGENCY_GROUPS:
+        stmt = select(EmergencyCodeGroup).where(EmergencyCodeGroup.code == g_data["code"])
+        result = await db.execute(stmt)
+        existing_group = result.scalar_one_or_none()
+        if not existing_group:
+            new_group = EmergencyCodeGroup(
+                code=g_data["code"],
+                name=g_data["name"],
+                color_hex=g_data["color_hex"],
+                badge_color=g_data["badge_color"],
+                description=g_data["description"],
+                call_to_action=g_data["call_to_action"],
+                is_active=True,
+            )
+            # Default assign Nurse & Super Admin to CODE_BLUE and RAPID_RESPONSE
+            if g_data["code"] in ["CODE_BLUE", "RAPID_RESPONSE"]:
+                if nurse_user and nurse_user not in new_group.members:
+                    new_group.members.append(nurse_user)
+                if admin_user and admin_user not in new_group.members:
+                    new_group.members.append(admin_user)
+            elif g_data["code"] in ["CODE_RED", "CODE_YELLOW"]:
+                if admin_user and admin_user not in new_group.members:
+                    new_group.members.append(admin_user)
+
+            db.add(new_group)
+            groups_map[g_data["code"]] = new_group
+        else:
+            groups_map[g_data["code"]] = existing_group
+
     await db.commit()
-    logger.info("Database initialized with staff, departments, doctors, lab catalog, and pharmacy stock successfully.")
+    logger.info("Database initialized with staff, departments, doctors, emergency code groups, and pharmacy stock successfully.")

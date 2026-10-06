@@ -11,6 +11,7 @@ from app.models.consultation import Consultation, PrescriptionItem
 from app.models.lab import LabTestCatalog, LabOrder, LabResult
 from app.models.pharmacy import PharmacyMedicine, MedicineDispenseRecord
 from app.models.patient import PatientMedicalProfile, PatientVitalsLog
+from app.models.emergency import EmergencyCodeGroup, EmergencyAlert, EmergencyAlertResponder, emergency_group_members
 
 __all__ = [
     "TimestampMixin",
@@ -35,4 +36,8 @@ __all__ = [
     "MedicineDispenseRecord",
     "PatientMedicalProfile",
     "PatientVitalsLog",
+    "EmergencyCodeGroup",
+    "EmergencyAlert",
+    "EmergencyAlertResponder",
+    "emergency_group_members",
 ]
